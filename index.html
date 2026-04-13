@@ -17,9 +17,49 @@
   <body
     class="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"
   >
-    <div
-      class="max-w-7xl w-full bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-slate-700/50"
-    >
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div class="bg-slate-800 border border-slate-700 rounded-3xl shadow-2xl p-10 w-full max-w-md">
+        <h2 class="text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-2">Welcome</h2>
+        <p class="text-slate-400 text-center mb-8 text-sm">Login or register to book your seat</p>
+
+        <!-- Tab switcher -->
+        <div class="flex rounded-xl overflow-hidden border border-slate-700 mb-8">
+          <button id="tab-login" onclick="switchTab('login')"
+            class="flex-1 py-2 text-sm font-semibold bg-emerald-500 text-white transition-all">Login</button>
+          <button id="tab-register" onclick="switchTab('register')"
+            class="flex-1 py-2 text-sm font-semibold bg-slate-700 text-slate-400 transition-all">Register</button>
+        </div>
+
+        <div id="error-msg" class="hidden mb-4 text-rose-400 text-sm text-center bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-2"></div>
+
+        <form id="auth-form" onsubmit="handleAuth(event)" class="flex flex-col gap-4">
+          <div id="name-field" class="hidden flex-col gap-1">
+            <label class="text-slate-400 text-sm">Name</label>
+            <input id="input-name" type="text" placeholder="Your name"
+              class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-slate-400 text-sm">Email</label>
+            <input id="input-email" type="email" placeholder="you@example.com" required
+              class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-slate-400 text-sm">Password</label>
+            <input id="input-password" type="password" placeholder="••••••••" required
+              class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors" />
+          </div>
+          <button type="submit"
+            class="mt-2 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
+            <span id="submit-label">Login</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Main App (hidden until logged in) -->
+    <div id="app" class="hidden max-w-7xl w-full bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-slate-700/50">
       <div class="text-center mb-10">
         <h1
           class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 tracking-tight"
@@ -31,6 +71,10 @@
           </span>
         </h1>
         <p class="text-slate-400 text-lg">Jassi ko ghar ki yaad kyu nhi aai?</p>
+        <div class="mt-4 flex items-center justify-center gap-3">
+          <span id="user-greeting" class="text-emerald-400 text-sm font-medium"></span>
+          <button onclick="logout()" class="text-slate-500 hover:text-rose-400 text-xs underline transition-colors">Logout</button>
+        </div>
       </div>
 
       <div class="flex justify-center mb-10">
@@ -41,9 +85,7 @@
             <div
               class="w-4 h-4 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
             ></div>
-            <span class="text-slate-300 font-medium tracking-wide"
-              >Available</span
-            >
+            <span class="text-slate-300 font-medium tracking-wide">Available</span>
           </div>
           <div class="w-px h-6 bg-slate-700"></div>
           <div class="flex items-center gap-3">
@@ -59,17 +101,105 @@
         <div
           class="bg-slate-900/40 p-8 rounded-2xl border border-slate-700/50 shadow-inner"
         >
-          <table
-            id="tbl"
-            class="border-separate border-spacing-4 mx-auto"
-          ></table>
+          <table id="tbl" class="border-separate border-spacing-4 mx-auto"></table>
         </div>
       </div>
     </div>
 
     <script>
-      async function run() {
+      let accessToken = null;
+      let currentUser = null;
+      let activeTab = "login";
+
+      function switchTab(tab) {
+        activeTab = tab;
+        const nameField = document.getElementById("name-field");
+        const submitLabel = document.getElementById("submit-label");
+        const tabLogin = document.getElementById("tab-login");
+        const tabRegister = document.getElementById("tab-register");
+        clearError();
+
+        if (tab === "register") {
+          nameField.classList.remove("hidden");
+          nameField.classList.add("flex");
+          submitLabel.textContent = "Register";
+          tabRegister.classList.replace("bg-slate-700", "bg-emerald-500");
+          tabRegister.classList.replace("text-slate-400", "text-white");
+          tabLogin.classList.replace("bg-emerald-500", "bg-slate-700");
+          tabLogin.classList.replace("text-white", "text-slate-400");
+        } else {
+          nameField.classList.add("hidden");
+          nameField.classList.remove("flex");
+          submitLabel.textContent = "Login";
+          tabLogin.classList.replace("bg-slate-700", "bg-emerald-500");
+          tabLogin.classList.replace("text-slate-400", "text-white");
+          tabRegister.classList.replace("bg-emerald-500", "bg-slate-700");
+          tabRegister.classList.replace("text-white", "text-slate-400");
+        }
+      }
+
+      function showError(msg) {
+        const el = document.getElementById("error-msg");
+        el.textContent = msg;
+        el.classList.remove("hidden");
+      }
+
+      function clearError() {
+        document.getElementById("error-msg").classList.add("hidden");
+      }
+
+      async function handleAuth(e) {
+        e.preventDefault();
+        clearError();
+        const email = document.getElementById("input-email").value.trim();
+        const password = document.getElementById("input-password").value;
+        const name = document.getElementById("input-name").value.trim();
+
+        const url = activeTab === "login" ? "/login" : "/register";
+        const body = activeTab === "login" ? { email, password } : { name, email, password };
+
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            showError(data.error);
+            return;
+          }
+          if (!data.token) {
+            showError("Authentication failed. Try again.");
+            return;
+          }
+
+          accessToken = data.token;
+          currentUser = data.user;
+
+          document.getElementById("auth-modal").classList.add("hidden");
+          document.getElementById("app").classList.remove("hidden");
+          document.getElementById("user-greeting").textContent = `Logged in as ${currentUser.name || currentUser.email}`;
+          loadSeats();
+        } catch (ex) {
+          showError("Network error: " + ex.message);
+        }
+      }
+
+      function logout() {
+        accessToken = null;
+        currentUser = null;
+        document.getElementById("tbl").innerHTML = "";
+        document.getElementById("app").classList.add("hidden");
+        document.getElementById("auth-modal").classList.remove("hidden");
+        document.getElementById("input-password").value = "";
+        clearError();
+      }
+
+      async function loadSeats() {
         const tbl = document.getElementById("tbl");
+        tbl.innerHTML = "";
         const res = await fetch("/seats");
         const resarray = await res.json();
         const j = resarray.sort((a, b) => a.id - b.id);
@@ -78,21 +208,19 @@
           if (i % 8 === 0) tr = document.createElement("tr");
 
           const td = document.createElement("td");
-
-          // Base aesthetic classes - added 'relative group' for tooltip positioning
           const baseClasses =
             "w-32 h-32 rounded-2xl text-center align-middle text-2xl font-bold transition-all duration-300 select-none relative group";
 
           if (j[i].isbooked) {
             td.className = `${baseClasses} bg-rose-500/10 text-rose-500/60 border border-rose-500/20 cursor-not-allowed`;
             td.innerHTML = `
-                    <span class="relative z-10">${j[i].id}</span>
-                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-4 py-2 bg-slate-900 border border-slate-700 text-sm text-slate-300 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap shadow-2xl z-50 pointer-events-none font-normal shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                        Booked by: <span class="font-bold text-white ml-1">${j[i].name}</span>
-                        <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-slate-700"></div>
-                        <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[2px] border-[5px] border-transparent border-t-slate-900"></div>
-                    </div>
-                `;
+              <span class="relative z-10">${j[i].id}</span>
+              <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-4 py-2 bg-slate-900 border border-slate-700 text-sm text-slate-300 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap shadow-2xl z-50 pointer-events-none font-normal shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
+                Booked by: <span class="font-bold text-white ml-1">${j[i].name}</span>
+                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-slate-700"></div>
+                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[2px] border-[5px] border-transparent border-t-slate-900"></div>
+              </div>
+            `;
           } else {
             td.className = `${baseClasses} bg-emerald-500 text-white border-2 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer hover:bg-emerald-400 hover:-translate-y-1.5 hover:shadow-[0_10px_25px_rgba(16,185,129,0.5)] active:scale-95 active:shadow-[0_0_10px_rgba(16,185,129,0.3)]`;
             td.innerHTML = `<span class="relative z-10">${j[i].id}</span>`;
@@ -100,42 +228,49 @@
 
           td.addEventListener("click", async function (e) {
             const currentTd = e.currentTarget;
-            if (currentTd.classList.contains("cursor-not-allowed")) {
-              return; // Seat is already taken
-            }
+            if (currentTd.classList.contains("cursor-not-allowed")) return;
 
             try {
-              const id = j[i].id; // Safe from loop closure
-              const name = prompt("Enter your name");
+              const id = j[i].id;
+              const name = prompt("Enter your name to confirm booking");
               if (!name) return;
 
-              const res = await fetch(`/${id}/${name}`, { method: "PUT" });
+              const res = await fetch(`/${id}/${name}`, {
+                method: "PUT",
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+
+              if (res.status === 401 || res.status === 403) {
+                alert("Session expired. Please login again.");
+                logout();
+                return;
+              }
+
               const data = await res.json();
 
               if (data.error) {
-                alert("FAILED! Couldn't book! already booked.");
+                alert("FAILED! Couldn't book — already booked.");
               } else {
                 alert("Booked successfully!");
-                // Visually transition to booked state upon success
                 currentTd.className = `${baseClasses} bg-rose-500/10 text-rose-500/60 border border-rose-500/20 cursor-not-allowed`;
                 currentTd.innerHTML = `
-                            <span class="relative z-10">${id}</span>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-4 py-2 bg-slate-900 border border-slate-700 text-sm text-slate-300 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap shadow-2xl z-50 pointer-events-none font-normal shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                                Booked by: <span class="font-bold text-white ml-1">${name}</span>
-                                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-slate-700"></div>
-                                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[2px] border-[5px] border-transparent border-t-slate-900"></div>
-                            </div>
-                        `;
+                  <span class="relative z-10">${id}</span>
+                  <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-4 py-2 bg-slate-900 border border-slate-700 text-sm text-slate-300 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap shadow-2xl z-50 pointer-events-none font-normal shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
+                    Booked by: <span class="font-bold text-white ml-1">${name}</span>
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-slate-700"></div>
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-[2px] border-[5px] border-transparent border-t-slate-900"></div>
+                  </div>
+                `;
               }
             } catch (ex) {
-              alert("error booking " + ex);
+              alert("Error booking: " + ex.message);
             }
           });
+
           tr.appendChild(td);
           tbl.appendChild(tr);
         }
       }
-      run();
     </script>
   </body>
 </html>
